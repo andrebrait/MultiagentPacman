@@ -28,6 +28,9 @@ class ReflexAgent(Agent):
 
   visitedPositions = util.Counter()
   currentState = None
+  initialFoodMap = None
+  initialPosition = None
+  initialCapsules = None
 
   def getAction(self, gameState):
     """
@@ -79,19 +82,37 @@ class ReflexAgent(Agent):
     newPos = successorGameState.getPacmanPosition()
     curPos = currentGameState.getPacmanPosition()
     newFood = successorGameState.getFood().asList()
+    oldCapsules = currentGameState.getCapsules()
     newGhostStates = successorGameState.getGhostStates()
     """:type : list[AgentState]"""
 
+    if not self.initialFoodMap:
+      self.initialFoodMap = util.Counter()
+      self.initialPosition = currentGameState.getPacmanPosition()
+      self.initialCapsules = currentGameState.getCapsules()
+      oldFood = currentGameState.getFood().asList()
+      for x in oldFood:
+        self.initialFoodMap[x] = 1
+
     if successorGameState.isWin():
-      return sys.maxint
+      return float('inf')
 
     if newPos == curPos:
-      return -sys.maxint
+      return float('-inf')
 
-    minGhostDistance = min([(sys.maxint if ghostState.scaredTimer > 0 else manhattanDistance(newPos, ghostState.getPosition())) for ghostState in newGhostStates])
+    minDistanceCapsule = 0
+    if successorGameState.getPacmanPosition() in oldCapsules:
+      return float('inf')
+    elif oldCapsules:
+      minDistanceCapsule = min([manhattanDistance(x, successorGameState.getPacmanPosition()) for x in oldCapsules])
 
-    if minGhostDistance < 3:
-      return -sys.maxint
+    if self.initialFoodMap[successorGameState.getPacmanPosition()] == 0 and successorGameState.getPacmanPosition() != self.initialPosition and successorGameState.getPacmanPosition() not in self.initialCapsules:
+      return float('-inf')
+
+    minGhostDistance = min([(float('inf') if ghostState.scaredTimer > 0 else manhattanDistance(newPos, ghostState.getPosition())) for ghostState in newGhostStates])
+
+    if minGhostDistance < 2:
+      return float('-inf')
 
     newFoodDistances = [manhattanDistance(newPos, food) for food in newFood]
     minNewFood = min(newFoodDistances)
@@ -100,16 +121,7 @@ class ReflexAgent(Agent):
       self.currentState = currentGameState.getPacmanPosition()
       self.visitedPositions[self.currentState] += 1
 
-    walls = successorGameState.getWalls()
-    x, y = successorGameState.getPacmanPosition()
-    numWallsPenalty = 0
-    for action in [Directions.NORTH, Directions.SOUTH, Directions.EAST, Directions.WEST]:
-      dx, dy = Actions.directionToVector(action)
-      nextx, nexty = int(x + dx), int(y + dy)
-      if walls[nextx][nexty]:
-        numWallsPenalty += 1
-
-    retVal = (successorGameState.getScore() - currentGameState.getScore()) - minNewFood - self.visitedPositions[successorGameState.getPacmanPosition()] - numWallsPenalty
+    retVal = (successorGameState.getScore() - currentGameState.getScore())**2 - minNewFood - self.visitedPositions[successorGameState.getPacmanPosition()] - minDistanceCapsule
 
     if successorGameState.getNumFood() < currentGameState.getNumFood():
       retVal += sum(newFoodDistances)
