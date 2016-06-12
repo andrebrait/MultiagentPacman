@@ -8,9 +8,12 @@
 
 from util import manhattanDistance
 from game import Directions
+import sys
 import random, util
 
 from game import Agent
+from pacman import GameState
+from game import AgentState
 
 class ReflexAgent(Agent):
   """
@@ -59,16 +62,44 @@ class ReflexAgent(Agent):
 
     Print out these variables to see what you're getting, then combine them
     to create a masterful evaluation function.
+
+    Parameters
+    ----------
+    currentGameState : pacman.GameState
+
+    Returns
+    -------
+    float
     """
     # Useful information you can extract from a GameState (pacman.py)
     successorGameState = currentGameState.generatePacmanSuccessor(action)
     newPos = successorGameState.getPacmanPosition()
-    oldFood = currentGameState.getFood()
+    curPos = currentGameState.getPacmanPosition()
+    newFood = successorGameState.getFood().asList()
     newGhostStates = successorGameState.getGhostStates()
-    newScaredTimes = [ghostState.scaredTimer for ghostState in newGhostStates]
+    """:type : list[AgentState]"""
+
+    if successorGameState.isWin():
+      return sys.maxint
+
+    if newPos == curPos:
+      return -sys.maxint
+
+    minGhostDistance = min([(sys.maxint if ghostState.scaredTimer > 0 else manhattanDistance(newPos, ghostState.getPosition())) for ghostState in newGhostStates])
+
+    if minGhostDistance < 2:
+      return -sys.maxint
+
+    newFoodDistances = [manhattanDistance(newPos, food) for food in newFood]
+    minNewFood = min(newFoodDistances)
+
+    retVal = currentGameState.getScore() - minNewFood + (successorGameState.getScore() - currentGameState.getScore())
+
+    if successorGameState.getNumFood() < currentGameState.getNumFood():
+      retVal += sum(newFoodDistances)
 
     "*** YOUR CODE HERE ***"
-    return successorGameState.getScore()
+    return retVal
 
 def scoreEvaluationFunction(currentGameState):
   """
