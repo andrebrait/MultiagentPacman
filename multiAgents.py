@@ -8,6 +8,7 @@
 
 from util import manhattanDistance
 from game import Directions
+from game import Actions
 import sys
 import random, util
 
@@ -25,6 +26,8 @@ class ReflexAgent(Agent):
     headers.
   """
 
+  visitedPositions = util.Counter()
+  currentState = None
 
   def getAction(self, gameState):
     """
@@ -87,13 +90,26 @@ class ReflexAgent(Agent):
 
     minGhostDistance = min([(sys.maxint if ghostState.scaredTimer > 0 else manhattanDistance(newPos, ghostState.getPosition())) for ghostState in newGhostStates])
 
-    if minGhostDistance < 2:
+    if minGhostDistance < 3:
       return -sys.maxint
 
     newFoodDistances = [manhattanDistance(newPos, food) for food in newFood]
     minNewFood = min(newFoodDistances)
 
-    retVal = currentGameState.getScore() - minNewFood + (successorGameState.getScore() - currentGameState.getScore())
+    if currentGameState.getPacmanPosition() != self.currentState:
+      self.currentState = currentGameState.getPacmanPosition()
+      self.visitedPositions[self.currentState] += 1
+
+    walls = successorGameState.getWalls()
+    x, y = successorGameState.getPacmanPosition()
+    numWallsPenalty = 0
+    for action in [Directions.NORTH, Directions.SOUTH, Directions.EAST, Directions.WEST]:
+      dx, dy = Actions.directionToVector(action)
+      nextx, nexty = int(x + dx), int(y + dy)
+      if walls[nextx][nexty]:
+        numWallsPenalty += 1
+
+    retVal = (successorGameState.getScore() - currentGameState.getScore()) - minNewFood - self.visitedPositions[successorGameState.getPacmanPosition()] - numWallsPenalty
 
     if successorGameState.getNumFood() < currentGameState.getNumFood():
       retVal += sum(newFoodDistances)
