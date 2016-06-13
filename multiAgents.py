@@ -11,6 +11,7 @@ from game import Directions
 from game import Actions
 import sys
 import random, util
+from math import isinf
 
 from game import Agent
 from pacman import GameState
@@ -94,37 +95,31 @@ class ReflexAgent(Agent):
       for x in oldFood:
         self.initialFoodMap[x] = 1
 
+    if currentGameState.getPacmanPosition() != self.currentState:
+      self.currentState = currentGameState.getPacmanPosition()
+      self.visitedPositions[self.currentState] += 1
+
     if successorGameState.isWin():
       return float('inf')
 
     if newPos == curPos:
       return float('-inf')
 
-    minDistanceCapsule = 0
+    minGhostDistance = min([manhattanDistance(newPos, ghostState.getPosition()) for ghostState in newGhostStates])
+
+    if minGhostDistance <= 1:
+      return float('-inf')
+
     if successorGameState.getPacmanPosition() in oldCapsules:
       return float('inf')
-    elif oldCapsules:
-      minDistanceCapsule = min([manhattanDistance(x, successorGameState.getPacmanPosition()) for x in oldCapsules])
 
     if self.initialFoodMap[successorGameState.getPacmanPosition()] == 0 and successorGameState.getPacmanPosition() != self.initialPosition and successorGameState.getPacmanPosition() not in self.initialCapsules:
       return float('-inf')
 
-    minGhostDistance = min([(float('inf') if ghostState.scaredTimer > 0 else manhattanDistance(newPos, ghostState.getPosition())) for ghostState in newGhostStates])
+    minNewFood = min([manhattanDistance(newPos, food) for food in newFood])
 
-    if minGhostDistance < 2:
-      return float('-inf')
-
-    newFoodDistances = [manhattanDistance(newPos, food) for food in newFood]
-    minNewFood = min(newFoodDistances)
-
-    if currentGameState.getPacmanPosition() != self.currentState:
-      self.currentState = currentGameState.getPacmanPosition()
-      self.visitedPositions[self.currentState] += 1
-
-    retVal = (successorGameState.getScore() - currentGameState.getScore())**2 - minNewFood - self.visitedPositions[successorGameState.getPacmanPosition()] - minDistanceCapsule
-
-    if successorGameState.getNumFood() < currentGameState.getNumFood():
-      retVal += sum(newFoodDistances)
+    retVal = (successorGameState.getScore() - currentGameState.getScore()) - minNewFood - \
+             (0 if self.visitedPositions[successorGameState.getPacmanPosition()] < 2 else self.visitedPositions[successorGameState.getPacmanPosition()])
 
     "*** YOUR CODE HERE ***"
     return retVal
