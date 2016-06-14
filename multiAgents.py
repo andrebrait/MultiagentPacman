@@ -27,8 +27,6 @@ class ReflexAgent(Agent):
     headers.
   """
 
-  visitedPositions = util.Counter()
-  currentState = None
   initialFoodMap = None
   initialPosition = None
   initialCapsules = None
@@ -95,10 +93,6 @@ class ReflexAgent(Agent):
       for x in oldFood:
         self.initialFoodMap[x] = 1
 
-    if currentGameState.getPacmanPosition() != self.currentState:
-      self.currentState = currentGameState.getPacmanPosition()
-      self.visitedPositions[self.currentState] += 1
-
     if successorGameState.isWin():
       return float('inf')
 
@@ -118,8 +112,7 @@ class ReflexAgent(Agent):
 
     minNewFood = min([manhattanDistance(newPos, food) for food in newFood])
 
-    retVal = (successorGameState.getScore() - currentGameState.getScore()) - minNewFood - \
-             (0 if self.visitedPositions[successorGameState.getPacmanPosition()] < 2 else self.visitedPositions[successorGameState.getPacmanPosition()])
+    retVal = (successorGameState.getScore() - currentGameState.getScore())*4 - minNewFood*4 + (0 if isinf(minGhostDistance) else minGhostDistance)
 
     "*** YOUR CODE HERE ***"
     return retVal
@@ -179,8 +172,33 @@ class MinimaxAgent(MultiAgentSearchAgent):
       gameState.getNumAgents():
         Returns the total number of agents in the game
     """
-    "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
+
+    lastIndex = gameState.getNumAgents() - 1
+
+    def minimax(curState, depth, agentIndex):
+      if depth == 0 or curState.isWin() or curState.isLose():
+        return self.evaluationFunction(curState), None
+
+      #Se o agente for o PacMan, procurar max
+      if agentIndex == 0:
+        retVal = float('-inf')
+        retAction = None
+        for action in [x for x in curState.getLegalActions(agentIndex) if x != Directions.STOP]:
+          resultGhostActions = minimax(curState.generateSuccessor(agentIndex, action), depth - 1, agentIndex + 1)
+          if resultGhostActions[0] > retVal:
+            retVal = resultGhostActions[0]
+            retAction = action
+        return retVal, retAction
+      #Se for um fantasma, fazer os min, ate que chegue o ultimo fantasma, no qual se passa para o pacman, que faz max
+      else:
+        retVal = float('inf')
+        for action in [x for x in curState.getLegalActions(agentIndex) if x != Directions.STOP]:
+          retVal = min(retVal, minimax(curState.generateSuccessor(agentIndex, action), depth if agentIndex < lastIndex else (depth - 1), (agentIndex + 1) if agentIndex < lastIndex else 0)[0])
+        return retVal, None
+
+    retVal = minimax(gameState, self.depth, 0)
+    return retVal[1]
+
 
 class AlphaBetaAgent(MultiAgentSearchAgent):
   """
@@ -191,8 +209,42 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
     """
       Returns the minimax action using self.depth and self.evaluationFunction
     """
-    "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
+
+    lastIndex = gameState.getNumAgents() - 1
+
+    def minimax(curState, depth, agentIndex, alpha, beta):
+      if depth == 0 or curState.isWin() or curState.isLose():
+        return self.evaluationFunction(curState), Directions.STOP
+
+      # Se o agente for o PacMan, procurar max
+      if agentIndex == 0:
+        if alpha >= beta:
+          return float('-inf'), Directions.STOP
+        retVal = float('-inf')
+        retAction = Directions.STOP
+        for action in [x for x in curState.getLegalActions(agentIndex) if x != Directions.STOP]:
+          resultGhostActions = minimax(curState.generateSuccessor(agentIndex, action), depth - 1, agentIndex + 1, alpha, beta)
+          if resultGhostActions[0] > retVal:
+            retVal = resultGhostActions[0]
+            retAction = action
+          alpha = max(alpha, retVal)
+        return retVal, retAction
+      # Se for um fantasma, fazer os min, ate que chegue o ultimo fantasma, no qual se passa para o pacman, que faz max
+      else:
+        if alpha >= beta:
+          return float('inf'), Directions.STOP
+        retVal = float('inf')
+        retAction = Directions.STOP
+        for action in [x for x in curState.getLegalActions(agentIndex) if x != Directions.STOP]:
+          curResult = resultGhostActionsAndPacman = minimax(curState.generateSuccessor(agentIndex, action), depth if agentIndex < lastIndex else (depth - 1), (agentIndex + 1) if agentIndex < lastIndex else 0, alpha, beta)
+          if curResult[0] < retVal:
+            retVal = curResult[0]
+            retAction = action
+          beta = min(beta, retVal)
+        return retVal, retAction
+
+    retVal = minimax(gameState, self.depth, 0, float('-inf'),float('inf'))
+    return retVal[1]
 
 class ExpectimaxAgent(MultiAgentSearchAgent):
   """
@@ -206,8 +258,40 @@ class ExpectimaxAgent(MultiAgentSearchAgent):
       All ghosts should be modeled as choosing uniformly at random from their
       legal moves.
     """
-    "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
+
+    lastIndex = gameState.getNumAgents() - 1
+
+    def minimax(curState, depth, agentIndex):
+      if depth == 0 or curState.isWin() or curState.isLose():
+        return self.evaluationFunction(curState), Directions.STOP
+
+      #Se o agente for o PacMan, procurar max
+      if agentIndex == 0:
+        retVal = float('-inf')
+        retAction = Directions.STOP
+        for action in [x for x in curState.getLegalActions(agentIndex) if x != Directions.STOP]:
+          resultGhostActions = minimax(curState.generateSuccessor(agentIndex, action), depth - 1, agentIndex + 1)
+          if resultGhostActions[0] > retVal:
+            retVal = resultGhostActions[0]
+            retAction = action
+        return retVal, retAction
+      #Se for um fantasma, fazer os min, ate que chegue o ultimo fantasma, no qual se passa para o pacman, que faz max
+      else:
+        retVal = float('inf')
+        retAction = Directions.STOP
+        expectedValue = 0.0
+        legalGhostStates = [x for x in curState.getLegalActions(agentIndex) if x != Directions.STOP]
+        numStates = len(legalGhostStates)
+        for action in legalGhostStates:
+          resultGhostActionsAndPacman = minimax(curState.generateSuccessor(agentIndex, action), depth if agentIndex < lastIndex else (depth - 1), (agentIndex + 1) if agentIndex < lastIndex else 0)
+          if resultGhostActionsAndPacman[0] < retVal:
+            retVal = resultGhostActionsAndPacman[0]
+            retAction = action
+          expectedValue += retVal/numStates
+        return expectedValue, retAction
+
+    retVal = minimax(gameState, self.depth, 0)
+    return retVal[1]
 
 def betterEvaluationFunction(currentGameState):
   """
@@ -216,8 +300,24 @@ def betterEvaluationFunction(currentGameState):
 
     DESCRIPTION: <write something here so we know what you did>
   """
+  curPos = currentGameState.getPacmanPosition()
+  newFood = currentGameState.getFood().asList()
+  newGhostStates = currentGameState.getGhostStates()
+  """:type : list[AgentState]"""
+
+  if currentGameState.isWin():
+    return float('inf')
+
+  minGhostDistance = min([manhattanDistance(curPos, ghostState.getPosition()) if ghostState.scaredTimer <= 0 else float('inf') for ghostState in newGhostStates])
+  if minGhostDistance <= 1:
+    return float('-inf')
+
+  minNewFood = min([manhattanDistance(curPos, food) for food in newFood])
+
+  retVal = currentGameState.getScore() - minNewFood + (100 if isinf(minGhostDistance) else minGhostDistance)
+
   "*** YOUR CODE HERE ***"
-  util.raiseNotDefined()
+  return retVal
 
 # Abbreviation
 better = betterEvaluationFunction
